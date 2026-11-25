@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 export const CONFIG = {
   // OAuth "Web application" client ID from Google Cloud Console.
-  GOOGLE_CLIENT_ID: "PASTE-YOUR-CLIENT-ID.apps.googleusercontent.com",
+  GOOGLE_CLIENT_ID: "201926687553-lccln02pvlnmrgk8pq77i375b4gdnlc8.apps.googleusercontent.com",
 
   // Optional defaults (leave empty to keep this file free of personal info).
   NAME: "",
