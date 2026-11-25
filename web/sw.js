@@ -1,9 +1,9 @@
 // Offline support: app files are fetched fresh when online and served from
 // cache when offline. Google/Garmin data is never cached here.
-const CACHE = "hub-v1";
+const CACHE = "hub-v2";
 const SHELL = [
   "./", "index.html", "styles.css", "config.js", "manifest.webmanifest",
-  "js/app.js", "js/util.js", "js/google.js", "js/classroom.js", "js/events.js", "js/bible.js", "js/health.js", "js/profile.js",
+  "js/app.js", "js/util.js", "js/google.js", "js/classroom.js", "js/events.js", "js/bible.js", "js/health.js", "js/profile.js", "js/crypto.js", "js/apple.js",
   "icons/icon-192.png", "icons/apple-touch-icon.png",
 ];
 

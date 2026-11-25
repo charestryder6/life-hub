@@ -4,7 +4,8 @@ One home-screen app for:
 
 - **Assignments** from Google Classroom: overdue, due today, the next 7 days, and later
 - **Bible reading**: reading plans, a chapter checklist, a streak, a verse of the day, and a built-in reader
-- **Upcoming events** from Google Calendar, plus events you add yourself
+- **Upcoming events** from Google Calendar and your iPhone calendar, plus events you add yourself
+- **Reminders** from the Apple Reminders app
 - **Health** from Garmin: steps, Body Battery, sleep, resting heart rate, stress, HRV, and recent activities
 
 It's a web app you install to the home screen (a PWA). It works on iPhone, Android, and Mac, and it opens full-screen like a normal app.
@@ -80,6 +81,44 @@ Garmin doesn't offer a public API for personal apps. So a small script uses the 
 4. **Actions → Build hub → Run workflow.** When it's green, open the hub and enter your passphrase in the Health card. Do this once on each device.
 
 If Garmin stats stop updating after a few months, run `get_token.py` again and update the `GARMIN_TOKENS` secret.
+
+## Step 5: Apple Reminders + iPhone Calendar
+
+Apple doesn't let websites read Reminders, so an iPhone **Shortcut** sends them (plus the next 14 days of your iPhone calendar) to GitHub. GitHub encrypts them with your hub passphrase, the same as Garmin. Do Step 4's `HUB_PASSPHRASE` secret first.
+
+**A. Make a GitHub key the Shortcut can use** (on github.com):
+**Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
+- Name: `Hub Sync`. Expiration: 1 year.
+- Repository access: **Only select repositories → life-hub**
+- Permissions → Repository permissions → **Contents: Read and write** (needed to send data to the repo)
+- Generate it and copy it. You'll paste it into the Shortcut in step B. Don't share it.
+
+**B. Build the Shortcut** (iPhone → Shortcuts app → **+**). Name it exactly **Hub Sync**. Add these actions in order:
+
+1. **Find Reminders** → tap *Add Filter* → **Is Completed** · *is not* · on. Leave everything else as is.
+2. **Repeat with Each** (it fills in *Reminders*). Inside the repeat, add a **Text** action and build this line. The parts in [brackets] are variables: tap *Repeat Item*, then pick the property.
+   `R|`[Repeat Item → **Title**]`|`[Repeat Item → **Due Date**]`|`[Repeat Item → **List**]
+   For Due Date, tap the variable → **Date Format: ISO 8601** → turn **Include ISO 8601 Time** on.
+3. After *End Repeat*: **Combine Text** → *Repeat Results* with **New Lines**. Then **Set Variable** → name it `Reminders Text`.
+4. **Find Calendar Events** → Add Filter → **Start Date** · *is in the next* · **14 days**.
+5. **Repeat with Each** (Calendar Events). Inside, add a **Text** action:
+   `E|`[**Title**]`|`[**Start Date**]`|`[**End Date**]`|`[**Is All Day**]`|`[**Calendar**]`|`[**Location**]
+   Set both dates to **ISO 8601** with time, as in step 2.
+6. After *End Repeat*: **Combine Text** → *Repeat Results* with **New Lines**.
+7. **Text** action with two lines: [`Reminders Text`] on the first line, [*Combined Text*] on the second.
+8. **Get Contents of URL**:
+   - URL: `https://api.github.com/repos/charestryder6/life-hub/dispatches`
+   - Method: **POST**
+   - Headers: `Authorization` = `Bearer ` + your token from step A (keep the space after *Bearer*), and `Accept` = `application/vnd.github+json`
+   - Request Body: **JSON**. Add field `event_type` (Text) = `apple`. Add field `client_payload` (**Dictionary**). Inside it, add `text` (Text) = the *Text* from step 7.
+
+Tap ▶ to test. The first run asks permission for Reminders and Calendar, so allow both. After about 1–2 minutes the hub's **Reminders** card fills in.
+
+**C. Make it run by itself** (Shortcuts → **Automation** → **+**):
+- **App** → choose *Reminders* and *Calendar* → **Is Closed** → **Run Immediately** → *Hub Sync*. Now it updates every time you leave those apps.
+- **Time of Day** → 6:00 AM → Daily → **Run Immediately** → *Hub Sync*.
+
+The hub's **Sync from iPhone** button also runs the Shortcut on demand (iPhone only).
 
 ## Using it
 

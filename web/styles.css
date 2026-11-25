@@ -111,6 +111,9 @@ body.syncing .sync-icon { animation: spin 1s linear infinite; }
 [data-kind="bible"] .mark { background: var(--bible); }
 [data-kind="events"] .mark { background: var(--events); }
 [data-kind="health"] .mark { background: var(--health); }
+[data-kind="reminders"] .mark { background: var(--bad); }
+.task-title { font-weight: 550; display: block; }
+.row-between { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .card-foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
 
 .section-label { font-size: 12px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 14px 0 6px; display: flex; align-items: center; gap: 6px; }

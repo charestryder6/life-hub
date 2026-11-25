@@ -1,4 +1,6 @@
 .garmin-cache/
+.apple-cache/
+web/data/apple.enc.json
 web/data/garmin.json
 web/data/garmin.enc.json
 __pycache__/

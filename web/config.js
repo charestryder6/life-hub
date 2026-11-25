@@ -19,4 +19,7 @@ export const CONFIG = {
 
   // Where the encrypted Garmin file is published (written by the GitHub Action).
   GARMIN_DATA_URL: "data/garmin.enc.json",
+
+  // Encrypted Apple Reminders + iPhone Calendar (sent by the "Hub Sync" Shortcut).
+  APPLE_DATA_URL: "data/apple.enc.json",
 };

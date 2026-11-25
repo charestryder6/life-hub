@@ -3,52 +3,24 @@
 // so it's safe to sit on a public web host. It's decrypted here in the browser.
 
 import { CONFIG } from "../config.js";
-import { store, esc, fmtNum, timeAgo, parseDateKey } from "./util.js";
+import { esc, fmtNum, timeAgo, parseDateKey } from "./util.js";
+import { loadEncrypted } from "./crypto.js";
 
-const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-
-async function decrypt(payload, passphrase) {
-  const enc = new TextEncoder();
-  const baseKey = await crypto.subtle.importKey("raw", enc.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
-  const key = await crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: b64(payload.salt), iterations: payload.iter || 250000, hash: "SHA-256" },
-    baseKey,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["decrypt"],
-  );
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(payload.iv) }, key, b64(payload.ct));
-  return JSON.parse(new TextDecoder().decode(plain));
-}
-
-export const getPassphrase = () => store.get("garmin.passphrase", "");
-export const setPassphrase = (p) => (p ? store.set("garmin.passphrase", p) : store.del("garmin.passphrase"));
+export { getPassphrase, setPassphrase } from "./crypto.js";
 
 /** Returns { data } or { error, needsPassphrase }. Falls back to the last good copy. */
 export async function loadHealth() {
-  let payload;
-  try {
-    const res = await fetch(`${CONFIG.GARMIN_DATA_URL}?t=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) throw new Error("not found");
-    payload = await res.json();
-  } catch {
-    const cached = store.get("garmin.cache", null);
-    return cached ? { data: cached, stale: true } : { error: "No Garmin data published yet." };
-  }
+  const r = await loadEncrypted(CONFIG.GARMIN_DATA_URL, "garmin.cache");
+  if (r.missing) r.error = "No Garmin data published yet.";
+  return r;
+}
 
-  if (!payload.ct) {
-    store.set("garmin.cache", payload);
-    return { data: payload };
-  }
-  const pass = getPassphrase();
-  if (!pass) return { needsPassphrase: true };
-  try {
-    const data = await decrypt(payload, pass);
-    store.set("garmin.cache", data);
-    return { data };
-  } catch {
-    return { needsPassphrase: true, error: "That passphrase didn't unlock the Garmin data." };
-  }
+export function passphraseForm(error) {
+  return `${error ? `<div class="note warn">${esc(error)}</div>` : `<p class="muted">Enter your hub passphrase to unlock this on this device.</p>`}
+    <form class="inline-form" data-form="passphrase">
+      <input type="password" name="pass" placeholder="Hub passphrase" autocomplete="current-password" required>
+      <button class="btn primary">Unlock</button>
+    </form>`;
 }
 
 function ring(value, goal, label) {
@@ -91,12 +63,7 @@ export function renderHealth(el, result) {
     return;
   }
   if (result.needsPassphrase) {
-    el.innerHTML = `
-      ${result.error ? `<div class="note warn">${esc(result.error)}</div>` : `<p class="muted">Enter your hub passphrase to unlock your Garmin stats on this device.</p>`}
-      <form class="inline-form" data-form="passphrase">
-        <input type="password" name="pass" placeholder="Hub passphrase" autocomplete="current-password" required>
-        <button class="btn primary">Unlock</button>
-      </form>`;
+    el.innerHTML = passphraseForm(result.error);
     return;
   }
   if (result.error && !result.data) {

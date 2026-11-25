@@ -1,26 +1,51 @@
 name: Build hub
 
 # Publishes web/ to GitHub Pages. Before publishing it pulls fresh Garmin
-# stats (encrypted with HUB_PASSPHRASE) into web/data/garmin.enc.json.
+# stats and the latest iPhone Reminders/Calendar data, both encrypted with
+# HUB_PASSPHRASE. Nothing personal is ever printed — Action logs are public.
 on:
   push:
     branches: [main]
   schedule:
     - cron: "23 */2 * * *" # every 2 hours
   workflow_dispatch:
+  repository_dispatch: # sent by the "Hub Sync" iPhone Shortcut
+    types: [apple]
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
-  build:
+  # Runs only when the iPhone Shortcut sends data. Kept outside the Pages
+  # queue so a new upload is never dropped while another build is waiting.
+  apple:
+    if: github.event_name == 'repository_dispatch'
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cryptography
+      - name: Encrypt iPhone data
+        env:
+          APPLE_TEXT: ${{ github.event.client_payload.text }}
+          HUB_PASSPHRASE: ${{ secrets.HUB_PASSPHRASE }}
+        run: python garmin_sync/apple_ingest.py
+      - uses: actions/cache/save@v4
+        with:
+          path: .apple-cache
+          key: apple-data-${{ github.run_id }}
+
+  build:
+    needs: apple
+    if: ${{ !cancelled() && (needs.apple.result == 'success' || needs.apple.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -31,7 +56,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Garmin sync
+      - name: Install sync tools
         run: pip install -r garmin_sync/requirements.txt
 
       - name: Restore saved Garmin login
@@ -55,6 +80,16 @@ jobs:
         with:
           path: .garmin-cache
           key: garmin-token-${{ github.run_id }}
+
+      - name: Restore latest iPhone data
+        uses: actions/cache/restore@v4
+        with:
+          path: .apple-cache
+          key: apple-data-none
+          restore-keys: apple-data-
+
+      - name: Add iPhone data to site
+        run: if [ -f .apple-cache/apple.enc.json ]; then cp .apple-cache/apple.enc.json web/data/; fi
 
       - uses: actions/configure-pages@v5
 

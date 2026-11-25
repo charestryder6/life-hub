@@ -22,8 +22,14 @@ export function setCalendarHidden(id, hidden) {
 }
 
 /** Normalised, sorted list of upcoming events from both sources. */
-export function allEvents(calData, now = new Date()) {
+export function allEvents(calData, extra = [], now = new Date()) {
   const hidden = hiddenCalendars();
+  const fromApple = extra.map((e) => {
+    const startDate = new Date(e.start);
+    let endDate = new Date(e.end);
+    if (isNaN(endDate) || endDate <= startDate) endDate = new Date(startDate.getTime() + (e.allDay ? 86400000 : 3600000));
+    return { ...e, startDate, endDate, manual: false };
+  }).filter((e) => !isNaN(e.startDate));
   const fromCal = (calData?.events || [])
     .filter((e) => !hidden.has(e.calendarId))
     .map((e) => ({
@@ -57,7 +63,7 @@ export function allEvents(calData, now = new Date()) {
   if (stale.length) store.set("events.manual", manualEvents().filter((e) => !stale.includes(e)));
 
   const seen = new Set();
-  return [...fromCal, ...fromHub]
+  return [...fromCal, ...fromApple, ...fromHub]
     .filter((e) => e.endDate > now)
     .filter((e) => {
       const k = `${e.title}|${e.startDate.getTime()}`;
@@ -68,9 +74,9 @@ export function allEvents(calData, now = new Date()) {
     .sort((a, b) => a.startDate - b.startDate);
 }
 
-export function renderEvents(el, calData, { connected, configured }) {
+export function renderEvents(el, calData, { connected, configured, extra = [] }) {
   const now = new Date();
-  const events = allEvents(calData, now);
+  const events = allEvents(calData, extra, now);
   const byDay = new Map();
   for (const e of events) {
     const start = e.startDate < now ? now : e.startDate;
@@ -117,6 +123,6 @@ export function renderEvents(el, calData, { connected, configured }) {
     </div>`;
 }
 
-export function nextEvent(calData) {
-  return allEvents(calData)[0] || null;
+export function nextEvent(calData, extra = []) {
+  return allEvents(calData, extra)[0] || null;
 }

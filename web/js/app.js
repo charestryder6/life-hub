@@ -5,9 +5,11 @@ import { renderEvents, addManualEvent, removeManualEvent, nextEvent, hiddenCalen
 import * as Bible from "./bible.js";
 import { loadHealth, renderHealth, setPassphrase, getPassphrase } from "./health.js";
 import { profile, saveProfile } from "./profile.js";
+import { loadApple, renderReminders, appleEvents, toggleReminderHidden } from "./apple.js";
 
 const STALE_MS = 20 * 60 * 1000;
 let health = null;
+let apple = null;
 
 const cache = {
   get classroom() { return store.get("cache.classroom", null); },
@@ -39,7 +41,7 @@ function renderToday() {
   const b = buckets(cache.classroom);
   const due = b.today.length + b.week.length;
   const bs = Bible.summary();
-  const ev = nextEvent(cache.calendar);
+  const ev = nextEvent(cache.calendar, appleEvents(apple));
   const steps = health?.data?.today?.steps;
 
   const tile = (label, value, sub, target) => `
@@ -82,7 +84,8 @@ function renderAll() {
   $("#date").textContent = fmtDayDate(new Date());
   const configured = G.isConfigured();
   renderAssignments($("#assignments"), cache.classroom, { configured, connected: G.isConnected("classroom") });
-  renderEvents($("#events"), cache.calendar, { configured, connected: G.isConnected("calendar") });
+  renderEvents($("#events"), cache.calendar, { configured, connected: G.isConnected("calendar"), extra: appleEvents(apple) });
+  renderReminders($("#reminders"), apple);
   Bible.renderBible($("#bible"));
   renderHealth($("#health"), health);
   renderToday();
@@ -126,7 +129,7 @@ async function syncAll({ force = false } = {}) {
       if ((await syncGoogle(kind, { force })) === "redirecting") return;
     }
     renderAll();
-    health = await loadHealth();
+    [health, apple] = await Promise.all([loadHealth(), loadApple()]);
     renderAll();
   } finally {
     document.body.classList.remove("syncing");
@@ -278,6 +281,10 @@ document.addEventListener("click", async (e) => {
     toggleLocalDone(d.done);
     toast("Marked done in your hub (Classroom isn't changed).");
     renderAll();
+  } else if (d.rem) {
+    toggleReminderHidden(d.rem);
+    toast("Hidden in your hub (complete it in Reminders to remove it everywhere).");
+    renderAll();
   } else if (d.delEvent) {
     removeManualEvent(d.delEvent);
     renderAll();
@@ -302,7 +309,8 @@ document.addEventListener("click", async (e) => {
   } else if (d.action === "forget-pass") {
     setPassphrase("");
     store.del("garmin.cache");
-    health = await loadHealth();
+    store.del("apple.cache");
+    [health, apple] = await Promise.all([loadHealth(), loadApple()]);
     modal.close();
     renderAll();
   } else if (d.action === "reset") {
@@ -330,7 +338,7 @@ document.addEventListener("submit", async (e) => {
     openSettings();
   } else if (form.dataset.form === "passphrase") {
     setPassphrase(f.pass);
-    health = await loadHealth();
+    [health, apple] = await Promise.all([loadHealth(), loadApple()]);
   }
   renderAll();
 });
