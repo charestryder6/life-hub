@@ -29,7 +29,7 @@ def safe(fn, *args, default=None):
     try:
         return fn(*args)
     except Exception as e:  # each metric is optional — keep going
-        print(f"  ! {getattr(fn, '__name__', fn)} failed: {type(e).__name__}: {e}")
+        print(f"  ! {getattr(fn, '__name__', fn)} failed: {type(e).__name__}")
         return default
 
 
@@ -40,7 +40,7 @@ def login(passphrase: str) -> Garmin:
         try:
             candidates.append(("cached", json.dumps(decrypt(json.loads(TOKEN_CACHE.read_text()), passphrase))))
         except Exception as e:
-            print(f"  ! cached token unreadable: {e}")
+            print(f"  ! cached token unreadable: {type(e).__name__}")
     if os.getenv("GARMIN_TOKENS"):
         candidates.append(("secret", os.environ["GARMIN_TOKENS"].strip()))
 
@@ -51,7 +51,7 @@ def login(passphrase: str) -> Garmin:
             print(f"Logged in to Garmin with {label} token.")
             return api
         except Exception as e:
-            print(f"  ! {label} token failed: {type(e).__name__}: {e}")
+            print(f"  ! {label} token failed: {type(e).__name__}")
 
     if os.getenv("GARMIN_EMAIL") and os.getenv("GARMIN_PASSWORD"):  # local runs only
         api = Garmin(os.environ["GARMIN_EMAIL"], os.environ["GARMIN_PASSWORD"])
@@ -146,7 +146,7 @@ def main():
         print(f"Wrote {OUT_DIR / 'garmin.json'} (unencrypted — don't publish this).")
     else:
         (OUT_DIR / "garmin.enc.json").write_text(json.dumps(encrypt(data, passphrase)))
-        print(f"Wrote encrypted stats: {data['today']['steps']} steps on {data['date']}.")
+        print("Wrote encrypted Garmin stats.")  # logs are public — never print health data
 
     # Save the (possibly refreshed) token for the next run, encrypted.
     if passphrase:
