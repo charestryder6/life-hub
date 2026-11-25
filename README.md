@@ -2,10 +2,10 @@
 
 One home-screen app for:
 
-- **Assignments** from Google Classroom: overdue, due today, the next 7 days, and later
+- **Assignments** from a *School* list in Apple Reminders, sorted by due date or by urgency (priority)
 - **Bible reading**: reading plans, a chapter checklist, a streak, a verse of the day, and a built-in reader
-- **Upcoming events** from Google Calendar and your iPhone calendar, plus events you add yourself
-- **Reminders** from the Apple Reminders app
+- **Upcoming events** from your iPhone calendar (and optionally Google Calendar), plus events you add yourself
+- **Reminders**: everything else in the Apple Reminders app
 - **Health** from Garmin: steps, Body Battery, sleep, resting heart rate, stress, HRV, and recent activities
 
 It's a web app you install to the home screen (a PWA). It works on iPhone, Android, and Mac, and it opens full-screen like a normal app.
@@ -38,30 +38,20 @@ From then on, any change you push in GitHub Desktop republishes the hub automati
 - **Mac:** In Safari, choose **File → Add to Dock**. In Chrome, choose **⋮ → Cast, save, and share → Install page as app**.
 - **Android:** In Chrome, choose **⋮ → Add to Home screen**.
 
-The Bible tracker and your own events work right away. Classroom, Calendar, and Garmin need the steps below.
+The Bible tracker and your own events work right away. Assignments, Reminders, your iPhone calendar, and Garmin need the steps below.
 
-## Step 3: Google sign-in (Classroom + Calendar)
+## Step 3: Google Calendar (optional)
 
-Google requires every app that reads Classroom to have its own "client ID". Here's how to make one (about 10 minutes). Use your **personal Gmail** for this, because school accounts usually aren't allowed to create projects.
+Your iPhone calendar already comes in through the Shortcut in Step 5, so you can skip this step. Do it only if you also want a Google Calendar that isn't on your iPhone.
 
-1. Go to **console.cloud.google.com** → create a project called `Hub`.
-2. **APIs & Services → Library**: enable **Google Classroom API** and **Google Calendar API**.
-3. **APIs & Services → OAuth consent screen** (also called "Google Auth Platform"):
-   - User type: **External**. App name: `Hub`. Add your email as the support and contact email.
-   - **Audience / Test users:** add your school email **and** your personal Gmail.
-   - Leave the app in **Testing** mode. That's fine for personal use.
-4. **Credentials → Create credentials → OAuth client ID**
-   - Application type: **Web application**
+1. Go to **console.cloud.google.com** with your **personal Gmail** → create a project called `Hub`.
+2. **APIs & Services → Library**: enable **Google Calendar API**.
+3. **OAuth consent screen**: User type **External**, app name `Hub`, add your Gmail as a **test user**, and leave it in **Testing** mode.
+4. **Credentials → Create credentials → OAuth client ID**: choose **Web application**.
    - **Authorized JavaScript origins:** `https://YOUR-USERNAME.github.io`
    - **Authorized redirect URIs:** `https://YOUR-USERNAME.github.io/life-hub/` (the trailing `/` matters)
-5. Copy the **Client ID**. Paste it into `web/config.js` as `GOOGLE_CLIENT_ID`. Push the change.
-6. Open the hub → **Connect Classroom** → sign in with your school account. Then use **Connect Google Calendar** with whichever account has your events.
-
-**How sign-in works:** Google tokens last an hour. When you open the hub, it quietly gets a new one by bouncing through Google for a second. If Google ever needs you to sign in again, a yellow **Sign in** banner appears.
-
-**If you see "Access blocked: [your school] has not approved this app":** your school's Google admin blocks outside apps. You have two options:
-- Ask your school's IT to allow the app. Give them the client ID. It only asks for *read-only* access to your own courses and work.
-- Or skip Classroom. Instead, connect **Google Calendar** with your school account. Classroom puts every due date on your class calendars, so assignments still show up under "Upcoming".
+5. Paste the **Client ID** into `web/config.js` as `GOOGLE_CLIENT_ID`, then push the change.
+6. In the hub, open **⋯ → Settings → Google Calendar → Connect**.
 
 ## Step 4: Garmin
 
@@ -97,7 +87,7 @@ Apple doesn't let websites read Reminders, so an iPhone **Shortcut** sends them 
 
 1. **Find Reminders** → tap *Add Filter* → **Is Completed** · *is not* · on. Leave everything else as is.
 2. **Repeat with Each** (it fills in *Reminders*). Inside the repeat, add a **Text** action and build this line. The parts in [brackets] are variables: tap *Repeat Item*, then pick the property.
-   `R|`[Repeat Item → **Title**]`|`[Repeat Item → **Due Date**]`|`[Repeat Item → **List**]
+   `R|`[Repeat Item → **Title**]`|`[Repeat Item → **Due Date**]`|`[Repeat Item → **List**]`|`[Repeat Item → **Priority**]`|`[Repeat Item → **Is Flagged**]
    For Due Date, tap the variable → **Date Format: ISO 8601** → turn **Include ISO 8601 Time** on.
 3. After *End Repeat*: **Combine Text** → *Repeat Results* with **New Lines**. Then **Set Variable** → name it `Reminders Text`.
 4. **Find Calendar Events** → Add Filter → **Start Date** · *is in the next* · **14 days**.
@@ -122,14 +112,14 @@ The hub's **Sync from iPhone** button also runs the Shortcut on demand (iPhone o
 
 ## Using it
 
-- **Assignments:** tap a title to open it in Classroom. The circle hides an item in the hub only (useful for paper assignments). It doesn't turn anything in.
+- **Assignments:** in the Reminders app, make a list called **School** and add each assignment there. Give it a **due date** and a **priority** (None / Low `!` / Medium `!!` / High `!!!`), and flag anything extra important. To change a due date or urgency, edit the reminder in Reminders. It updates here on the next sync. In the hub, switch between **By due date** and **By urgency**. Tapping an assignment on iPhone or Mac opens Reminders. The circle hides an item in the hub only, so complete it in Reminders to clear it everywhere. To count other lists as school (one list per class works well), turn them on in **⋯ → Settings → Assignments**.
 - **Bible:** tap the circle next to a chapter to check it off. Tap the chapter name to read it right there (World English Bible). **All books** shows every chapter, and **Change plan** switches plans (whole Bible in a year, New Testament in 90 days, Gospels in 30 days, Psalms & Proverbs in 60 days, or free reading).
 - **Events:** **Add event** for things that aren't on a calendar. In ⚙ Settings, choose which calendars to show.
 - Your reading progress and added events are saved **on each device**. A phone and a laptop each keep their own copy.
 
 ## Changing settings
 
-Edit `web/config.js`: your name, the school email, the calendar account, and how many days of events to show.
+Your name, assignment lists, calendars, and reading plan are in **⋯ → Settings** in the hub. Each device saves its own. `web/config.js` holds the Google client ID and how many days of events to show.
 
 ## Privacy
 

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Hub</title>
   <meta name="description" content="Assignments, Bible reading, events and health in one place.">
-  <meta name="theme-color" content="#f5f3ee" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#111317" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -20,15 +20,15 @@
   <main class="wrap">
     <header class="top">
       <div>
+        <p id="date" class="eyebrow"></p>
         <h1 id="greeting">Hello</h1>
-        <p id="date" class="muted"></p>
       </div>
       <div class="top-actions">
-        <button class="icon-btn lg" data-action="sync" aria-label="Refresh">
-          <svg class="sync-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12A8 8 0 0 1 18.3 7.1M18.5 3v4.3h-4.3M5.5 21v-4.3h4.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <button class="circle-btn" data-action="sync" aria-label="Refresh">
+          <svg class="sync-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12A8 8 0 0 1 18.3 7.1M18.5 3v4.3h-4.3M5.5 21v-4.3h4.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
-        <button class="icon-btn lg" data-action="settings" aria-label="Settings">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <button class="circle-btn" data-action="settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
         </button>
       </div>
     </header>
@@ -40,25 +40,40 @@
     <div class="grid">
       <div class="col">
         <section class="card" id="card-assignments" data-kind="assign">
-          <h2><span class="mark"></span>Assignments</h2>
+          <h2>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4.5" fill="currentColor"/><path d="M7 8.5l1.3 1.3L10.8 7.2M13 8.7h4.2M7 14.5l1.3 1.3 2.5-2.6M13 14.8h4.2" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Assignments
+          </h2>
           <div id="assignments"></div>
         </section>
         <section class="card" id="card-events" data-kind="events">
-          <h2><span class="mark"></span>Upcoming</h2>
+          <h2>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="4" fill="currentColor"/><path d="M8 2.8v3.6M16 2.8v3.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3.5 9.5h17" stroke="#fff" stroke-width="1.5"/><circle cx="8" cy="14" r="1.2" fill="#fff"/><circle cx="12" cy="14" r="1.2" fill="#fff"/><circle cx="16" cy="14" r="1.2" fill="#fff"/><circle cx="8" cy="17.6" r="1.2" fill="#fff"/><circle cx="12" cy="17.6" r="1.2" fill="#fff"/></svg>
+            Upcoming
+          </h2>
           <div id="events"></div>
         </section>
         <section class="card" id="card-reminders" data-kind="reminders">
-          <h2><span class="mark"></span>Reminders</h2>
+          <h2>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="6" r="2.2" fill="currentColor"/><circle cx="5" cy="12" r="2.2" fill="currentColor"/><circle cx="5" cy="18" r="2.2" fill="currentColor"/><path d="M10 6h11M10 12h11M10 18h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Reminders
+          </h2>
           <div id="reminders"></div>
         </section>
       </div>
       <div class="col">
         <section class="card" id="card-bible" data-kind="bible">
-          <h2><span class="mark"></span>Bible reading</h2>
+          <h2>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.2C10 4.6 7 4 3.5 4.2v14.3c3.4-.2 6.3.4 8.5 2 2.2-1.6 5.1-2.2 8.5-2V4.2C17 4 14 4.6 12 6.2z" fill="currentColor"/><path d="M12 6.4v13.8" stroke="#fff" stroke-width="1.3"/></svg>
+            Bible Reading
+          </h2>
           <div id="bible"></div>
         </section>
         <section class="card" id="card-health" data-kind="health">
-          <h2><span class="mark"></span>Health</h2>
+          <h2>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.8-4.7-9.3-9.6C1.6 7.6 4 4 7.5 4c2 0 3.5 1.1 4.5 2.6C13 5.1 14.5 4 16.5 4 20 4 22.4 7.6 21.3 11.4 19.8 16.3 12 21 12 21z" fill="currentColor"/></svg>
+            Health
+          </h2>
           <div id="health"></div>
         </section>
       </div>
@@ -66,9 +81,11 @@
   </main>
 
   <dialog id="modal">
+    <div class="modal-grabber" aria-hidden="true"></div>
     <div class="modal-head">
+      <span></span>
       <h2 id="modal-title"></h2>
-      <button class="icon-btn" data-action="close" aria-label="Close">×</button>
+      <button class="modal-done" data-action="close">Done</button>
     </div>
     <div id="modal-body"></div>
   </dialog>

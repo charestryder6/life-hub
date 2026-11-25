@@ -1,20 +1,25 @@
-import { store, esc, $, toast, fmtDayDate, relDay, fmtTime, fmtNum, dateKey } from "./util.js";
+import { store, esc, $, $$, toast, relDay, fmtTime, fmtNum, dateKey } from "./util.js";
 import * as G from "./google.js";
-import { renderAssignments, buckets, toggleLocalDone } from "./classroom.js";
 import { renderEvents, addManualEvent, removeManualEvent, nextEvent, hiddenCalendars, setCalendarHidden } from "./events.js";
 import * as Bible from "./bible.js";
 import { loadHealth, renderHealth, setPassphrase, getPassphrase } from "./health.js";
 import { profile, saveProfile } from "./profile.js";
-import { loadApple, renderReminders, appleEvents, toggleReminderHidden } from "./apple.js";
+import {
+  loadApple, renderAssignments, renderReminders, appleEvents, toggleReminderHidden,
+  assignmentSummary, allLists, schoolLists, setSchoolLists,
+} from "./apple.js";
 
 const STALE_MS = 20 * 60 * 1000;
 let health = null;
 let apple = null;
 
 const cache = {
-  get classroom() { return store.get("cache.classroom", null); },
   get calendar() { return store.get("cache.calendar", null); },
 };
+
+// Tidy up data from the old Google Classroom version.
+["cache.classroom", "connected.classroom", "token.classroom", "reconnect.classroom", "profile.schoolEmail", "classroom.done"]
+  .forEach((k) => store.del(k));
 
 // ── Rendering ────────────────────────────────────────────────
 
@@ -33,47 +38,50 @@ function reconnectBanner() {
     return;
   }
   el.hidden = false;
-  el.innerHTML = `Google needs you to sign in again to refresh ${kinds.map((k) => G.ACCOUNTS[k].label).join(" and ")}.
-    ${kinds.map((k) => `<button class="btn small" data-connect="${k}">Sign in</button>`).join(" ")}`;
+  el.innerHTML = `<span>Sign in again to refresh ${kinds.map((k) => G.ACCOUNTS[k].label).join(" and ")}.</span>
+    ${kinds.map((k) => `<button class="btn small primary" data-connect="${k}">Sign In</button>`).join(" ")}`;
 }
 
 function renderToday() {
-  const b = buckets(cache.classroom);
-  const due = b.today.length + b.week.length;
+  const a = assignmentSummary(apple);
   const bs = Bible.summary();
   const ev = nextEvent(cache.calendar, appleEvents(apple));
   const steps = health?.data?.today?.steps;
 
-  const tile = (label, value, sub, target) => `
-    <button class="tile" data-jump="${target}">
-      <span class="muted small">${esc(label)}</span>
+  const tile = (kind, label, value, sub, target) => `
+    <button class="tile" data-kind="${kind}" data-jump="${target}">
+      <span class="tile-label">${esc(label)}</span>
       <strong>${value}</strong>
-      <span class="muted small">${sub}</span>
+      <span class="tile-sub">${sub}</span>
     </button>`;
 
   $("#today").innerHTML = [
     tile(
-      "Due this week",
-      cache.classroom ? due : "–",
-      b.overdue.length ? `<span class="bad">${b.overdue.length} overdue</span>` : b.today.length ? `${b.today.length} due today` : "on track",
+      "assign",
+      "Due This Week",
+      a ? a.week : "–",
+      !a ? "Reminders" : a.overdue ? `<span class="bad">${a.overdue} overdue</span>` : a.today ? `${a.today} due today` : "On track",
       "card-assignments",
     ),
     tile(
-      "Bible today",
+      "bible",
+      "Bible Today",
       bs.today.length ? `${bs.todayDone}/${bs.today.length}` : bs.readToday,
-      bs.streak ? `${bs.streak}-day streak` : "start a streak",
+      bs.streak ? `${bs.streak}-day streak` : "Start a streak",
       "card-bible",
     ),
     tile(
-      "Next up",
+      "events",
+      "Next Up",
       ev ? esc(ev.title) : "–",
-      ev ? esc(`${relDay(ev.startDate)}${ev.allDay ? "" : ` · ${fmtTime(ev.startDate)}`}`) : "no events",
+      ev ? esc(`${relDay(ev.startDate)}${ev.allDay ? "" : ` · ${fmtTime(ev.startDate)}`}`) : "No events",
       "card-events",
     ),
     tile(
+      "health",
       "Steps",
       steps != null ? fmtNum(steps) : "–",
-      health?.data?.today?.stepGoal ? `goal ${fmtNum(health.data.today.stepGoal)}` : "Garmin",
+      health?.data?.today?.stepGoal ? `Goal ${fmtNum(health.data.today.stepGoal)}` : "Garmin",
       "card-health",
     ),
   ].join("");
@@ -81,10 +89,9 @@ function renderToday() {
 
 function renderAll() {
   $("#greeting").textContent = greeting();
-  $("#date").textContent = fmtDayDate(new Date());
-  const configured = G.isConfigured();
-  renderAssignments($("#assignments"), cache.classroom, { configured, connected: G.isConnected("classroom") });
-  renderEvents($("#events"), cache.calendar, { configured, connected: G.isConnected("calendar"), extra: appleEvents(apple) });
+  $("#date").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  renderAssignments($("#assignments"), apple);
+  renderEvents($("#events"), cache.calendar, { configured: G.isConfigured(), connected: G.isConnected("calendar"), extra: appleEvents(apple) });
   renderReminders($("#reminders"), apple);
   Bible.renderBible($("#bible"));
   renderHealth($("#health"), health);
@@ -94,7 +101,7 @@ function renderAll() {
 
 // ── Sync ─────────────────────────────────────────────────────
 
-const fetchers = { classroom: G.fetchClassroom, calendar: G.fetchCalendar };
+const fetchers = { calendar: G.fetchCalendar };
 
 async function syncGoogle(kind, { force = false } = {}) {
   if (!G.isConfigured() || !G.isConnected(kind)) return;
@@ -125,9 +132,7 @@ async function syncGoogle(kind, { force = false } = {}) {
 async function syncAll({ force = false } = {}) {
   document.body.classList.add("syncing");
   try {
-    for (const kind of ["classroom", "calendar"]) {
-      if ((await syncGoogle(kind, { force })) === "redirecting") return;
-    }
+    if ((await syncGoogle("calendar", { force })) === "redirecting") return;
     renderAll();
     [health, apple] = await Promise.all([loadHealth(), loadApple()]);
     renderAll();
@@ -144,7 +149,8 @@ function openModal(title, html, { wide = false } = {}) {
   $("#modal-title").textContent = title;
   $("#modal-body").innerHTML = html;
   modal.classList.toggle("wide", wide);
-  modal.showModal();
+  if (!modal.open) modal.showModal();
+  $("#modal-body").scrollTop = 0;
 }
 
 async function openReader(key) {
@@ -152,9 +158,9 @@ async function openReader(key) {
   const next = Bible.nextChapterAfter(key);
   openModal(key, `<div class="reader"><p class="muted">Loading ${esc(key)}…</p></div>`, { wide: true });
   const foot = () => `
-    <div class="row-actions sticky-foot">
-      <button class="btn primary" data-read-done="${esc(key)}" ${next ? `data-next="${esc(next)}"` : ""}>
-        ${Bible.isRead(key) ? "Read ✓" : "Mark as read"}${next ? " & next" : ""}</button>
+    <div class="sticky-foot">
+      <button class="btn primary block" data-read-done="${esc(key)}" ${next ? `data-next="${esc(next)}"` : ""}>
+        ${Bible.isRead(key) ? "Read ✓" : "Mark as Read"}${next ? " & Next" : ""}</button>
       <a class="btn ghost" href="https://www.bible.com/search/bible?q=${encodeURIComponent(key)}" target="_blank" rel="noopener">Other translations</a>
     </div>`;
   try {
@@ -170,80 +176,107 @@ async function openReader(key) {
 function openPlanPicker() {
   const s = Bible.summary();
   const opts = Object.entries(Bible.PLANS)
-    .map(([id, p]) => `<label class="radio"><input type="radio" name="plan" value="${id}" ${id === s.planId ? "checked" : ""}>
-      <span><strong>${esc(p.name)}</strong><span class="muted small">${p.chapters.length} chapters${p.days ? ` · about ${Math.ceil(p.chapters.length / p.days)} a day` : ""}</span></span></label>`)
+    .map(([id, p]) => `<label class="list-row radio"><input type="radio" name="plan" value="${id}" ${id === s.planId ? "checked" : ""}>
+      <span class="row-text"><span>${esc(p.name)}</span><span class="row-sub">${p.chapters.length} chapters${p.days ? ` · about ${Math.ceil(p.chapters.length / p.days)} a day` : ""}</span></span></label>`)
     .join("");
   openModal(
-    "Reading plan",
-    `<form data-form="plan" class="stack">
-      ${opts}
-      <label class="field"><span>Start date</span><input type="date" name="start" value="${esc(s.state.start)}"></label>
-      <p class="muted small">Chapters you've already checked off stay checked when you switch plans.</p>
-      <div class="row-actions"><button class="btn primary">Save plan</button></div>
+    "Reading Plan",
+    `<form data-form="plan">
+      <div class="list">${opts}</div>
+      <div class="list"><label class="list-row"><span>Start date</span><input type="date" name="start" value="${esc(s.state.start)}"></label></div>
+      <p class="list-foot">Chapters you've already checked off stay checked when you switch plans.</p>
+      <button class="btn primary block">Save Plan</button>
     </form>`,
   );
 }
 
 function openAddEvent() {
   openModal(
-    "Add event",
-    `<form data-form="event" class="stack">
-      <label class="field"><span>What</span><input name="title" required placeholder="Youth group, game, test…"></label>
-      <div class="two">
-        <label class="field"><span>Date</span><input type="date" name="date" required value="${dateKey()}"></label>
-        <label class="field"><span>Time (optional)</span><input type="time" name="time"></label>
+    "New Event",
+    `<form data-form="event">
+      <div class="list">
+        <label class="list-row"><input name="title" required placeholder="Title" aria-label="Title"></label>
+        <label class="list-row"><input name="note" placeholder="Location or note" aria-label="Location or note"></label>
       </div>
-      <label class="field"><span>Where / note</span><input name="note"></label>
-      <div class="row-actions"><button class="btn primary">Add</button></div>
+      <div class="list">
+        <label class="list-row"><span>Date</span><input type="date" name="date" required value="${dateKey()}"></label>
+        <label class="list-row"><span>Time</span><input type="time" name="time" aria-label="Time (optional)"></label>
+      </div>
+      <p class="list-foot">Leave the time empty for an all-day event.</p>
+      <button class="btn primary block">Add</button>
     </form>`,
   );
 }
 
+const switchRow = (label, attrs, on, dot = "") => `
+  <label class="list-row">
+    <span class="row-text">${dot}${label}</span>
+    <input type="checkbox" class="switch" ${attrs} ${on ? "checked" : ""}>
+  </label>`;
+
 function openSettings() {
+  const p = profile();
   const configured = G.isConfigured();
-  const acct = (kind) => {
-    const on = G.isConnected(kind);
-    const who = G.ACCOUNTS[kind].hint();
-    return `<div class="setting">
-      <div><strong>${esc(G.ACCOUNTS[kind].label)}</strong>
-        <div class="muted small">${on ? "Connected" : "Not connected"}${who ? ` · ${esc(who)}` : ""}</div></div>
-      ${configured ? (on ? `<button class="btn small ghost" data-disconnect="${kind}">Disconnect</button>` : `<button class="btn small" data-connect="${kind}">Connect</button>`) : ""}
-    </div>`;
-  };
+  const calOn = G.isConnected("calendar");
+
+  const lists = allLists(apple);
+  const school = schoolLists(apple);
+  const listRows = lists.length
+    ? lists.map((l) => switchRow(esc(l), `data-assign-list="${esc(l)}"`, school.has(l))).join("")
+    : `<div class="list-row"><span class="row-text"><span>School</span><span class="row-sub">Your lists show up here after the first iPhone sync.</span></span></div>`;
+
   const hidden = hiddenCalendars();
   const cals = (cache.calendar?.calendars || [])
-    .map((c) => `<label class="check"><input type="checkbox" data-cal="${esc(c.id)}" ${hidden.has(c.id) ? "" : "checked"}>
-      <span class="dot" style="background:${esc(c.color)}"></span>${esc(c.name)}</label>`)
+    .map((c) => switchRow(esc(c.name), `data-cal="${esc(c.id)}"`, !hidden.has(c.id), `<span class="dot" style="background:${esc(c.color)}"></span>`))
     .join("");
 
   openModal(
     "Settings",
-    `<div class="stack">
+    `<form data-form="profile">
       <h3>You</h3>
-      <form data-form="profile" class="stack">
-        <label class="field"><span>First name</span><input name="name" value="${esc(profile().name)}" autocomplete="given-name"></label>
-        <label class="field"><span>School email (Google Classroom)</span><input type="email" name="schoolEmail" value="${esc(profile().schoolEmail)}" autocomplete="email"></label>
-        <label class="field"><span>Calendar email (optional)</span><input type="email" name="calendarEmail" value="${esc(profile().calendarEmail)}"></label>
-        <p class="muted small">Saved only on this device. Used to pick the right Google account when you connect.</p>
-        <div><button class="btn small">Save</button></div>
-      </form>
-      <h3>Accounts</h3>
-      ${configured ? "" : `<div class="note warn">Add your Google client ID to <code>config.js</code> first (README → Step 3).</div>`}
-      ${acct("classroom")}
-      ${acct("calendar")}
-      ${cals ? `<h3>Calendars to show</h3><div class="stack tight">${cals}</div>` : ""}
-      <h3>Garmin</h3>
-      <div class="setting"><div><strong>Hub passphrase</strong>
-        <div class="muted small">${getPassphrase() ? "Saved on this device" : "Not set on this device"}</div></div>
-        ${getPassphrase() ? `<button class="btn small ghost" data-action="forget-pass">Forget</button>` : ""}</div>
-      <h3>Bible</h3>
-      <div class="setting"><div><strong>${esc(Bible.summary().plan.name)}</strong></div>
-        <button class="btn small" data-action="bible-plan">Change</button></div>
-      <h3>Put it on your home screen</h3>
-      <p class="muted small"><strong>iPhone:</strong> open in Safari → Share → Add to Home Screen.<br>
-      <strong>Mac:</strong> Safari → File → Add to Dock, or Chrome → ⋮ → Cast, save and share → Install page as app.</p>
-      <h3>Data</h3>
-      <div class="row-actions"><button class="btn small ghost danger" data-action="reset">Erase everything on this device</button></div>
+      <div class="list">
+        <label class="list-row"><span>Name</span><input name="name" value="${esc(p.name)}" placeholder="First name" autocomplete="given-name"></label>
+      </div>
+      <p class="list-foot">Saved only on this device.</p>
+
+      <h3>Assignments</h3>
+      <div class="list">${listRows}</div>
+      <p class="list-foot">Reminders lists that count as school work. Set due dates and priority
+        (<span class="prio p3">!!!</span> high, <span class="prio p2">!!</span> medium, <span class="prio p1">!</span> low) in the Reminders app.
+        They sync here when the “Hub Sync” Shortcut runs.</p>
+
+      <h3>Google Calendar</h3>
+      <div class="list">
+        <div class="list-row">
+          <span class="row-text"><span>Google Calendar</span><span class="row-sub">${calOn ? "Connected" : "Optional. Your iPhone calendar already syncs."}</span></span>
+          ${configured ? (calOn ? `<button type="button" class="btn small ghost" data-disconnect="calendar">Disconnect</button>` : `<button type="button" class="btn small" data-connect="calendar">Connect</button>`) : ""}
+        </div>
+        <label class="list-row"><span>Account</span><input type="email" name="calendarEmail" value="${esc(p.calendarEmail)}" placeholder="Optional"></label>
+        ${cals}
+      </div>
+    </form>
+
+    <h3>Health</h3>
+    <div class="list">
+      <div class="list-row">
+        <span class="row-text"><span>Hub passphrase</span><span class="row-sub">${getPassphrase() ? "Saved on this device" : "Not set on this device"}</span></span>
+        ${getPassphrase() ? `<button class="btn small ghost danger" data-action="forget-pass">Forget</button>` : ""}
+      </div>
+    </div>
+
+    <h3>Bible</h3>
+    <div class="list">
+      <button class="list-row nav" data-action="bible-plan">
+        <span>Reading plan</span><span class="value">${esc(Bible.summary().plan.name)}</span>
+      </button>
+    </div>
+
+    <h3>Home Screen</h3>
+    <p class="list-foot"><strong>iPhone:</strong> open in Safari → Share → Add to Home Screen.<br>
+      <strong>Mac:</strong> Safari → File → Add to Dock.</p>
+
+    <div class="list">
+      <button class="list-row destructive" data-action="reset">Erase Everything on This Device</button>
     </div>`,
   );
 }
@@ -277,13 +310,15 @@ document.addEventListener("click", async (e) => {
     Bible.toggleChapter(d.readDone, true);
     renderAll();
     d.next ? openReader(d.next) : modal.close();
-  } else if (d.done) {
-    toggleLocalDone(d.done);
-    toast("Marked done in your hub (Classroom isn't changed).");
-    renderAll();
   } else if (d.rem) {
     toggleReminderHidden(d.rem);
-    toast("Hidden in your hub (complete it in Reminders to remove it everywhere).");
+    toast("Hidden here. Complete it in Reminders to remove it everywhere.");
+    renderAll();
+  } else if (d.sort) {
+    store.set("assign.sort", d.sort);
+    renderAll();
+  } else if (d.assignList !== undefined) {
+    setSchoolLists($$("[data-assign-list]", modal).filter((x) => x.checked).map((x) => x.dataset.assignList));
     renderAll();
   } else if (d.delEvent) {
     removeManualEvent(d.delEvent);
@@ -294,7 +329,7 @@ document.addEventListener("click", async (e) => {
   } else if (d.jump) {
     document.getElementById(d.jump)?.scrollIntoView({ behavior: "smooth", block: "start" });
   } else if (d.action === "bible-browse") {
-    openModal("All books", `<div class="browser">${Bible.renderBrowser()}</div>`, { wide: true });
+    openModal("All Books", `<div class="browser">${Bible.renderBrowser()}</div>`, { wide: true });
   } else if (d.action === "bible-plan") {
     openPlanPicker();
   } else if (d.action === "add-event") {
@@ -303,7 +338,7 @@ document.addEventListener("click", async (e) => {
     openSettings();
   } else if (d.action === "sync") {
     await syncAll({ force: true });
-    toast("Up to date.");
+    toast("Up to date");
   } else if (d.action === "close") {
     modal.close();
   } else if (d.action === "forget-pass") {
@@ -321,6 +356,14 @@ document.addEventListener("click", async (e) => {
   }
 });
 
+// Settings save as you type, like iOS.
+document.addEventListener("change", (e) => {
+  const form = e.target.closest('form[data-form="profile"]');
+  if (!form || e.target.type === "checkbox") return;
+  saveProfile(Object.fromEntries(new FormData(form)));
+  renderAll();
+});
+
 document.addEventListener("submit", async (e) => {
   const form = e.target.closest("form[data-form]");
   if (!form) return;
@@ -334,8 +377,7 @@ document.addEventListener("submit", async (e) => {
     modal.close();
   } else if (form.dataset.form === "profile") {
     saveProfile(f);
-    toast("Saved on this device.");
-    openSettings();
+    toast("Saved");
   } else if (form.dataset.form === "passphrase") {
     setPassphrase(f.pass);
     [health, apple] = await Promise.all([loadHealth(), loadApple()]);
@@ -360,7 +402,7 @@ const back = G.handleRedirect();
 if (back) {
   if (back.ok) {
     store.del(`reconnect.${back.kind}`);
-    if (!back.silent) toast(`${G.ACCOUNTS[back.kind].label} connected.`);
+    if (!back.silent) toast(`${G.ACCOUNTS[back.kind].label} connected`);
   } else if (back.kind) {
     if (back.silent) store.set(`reconnect.${back.kind}`, true);
     else toast(`Google sign-in didn't finish: ${back.error}`);

@@ -1,4 +1,5 @@
-// Upcoming events: Google Calendar + events added by hand in the hub.
+// Upcoming events: iPhone calendar (via the Shortcut), Google Calendar
+// (optional) and events added by hand in the hub.
 
 import { store, esc, relDay, fmtTime, parseDateKey, dateKey, dayDiff, timeAgo } from "./util.js";
 
@@ -108,18 +109,13 @@ export function renderEvents(el, calData, { connected, configured, extra = [] })
     })
     .join("");
 
-  let foot = "";
-  if (configured && !connected) {
-    foot = `<button class="btn" data-connect="calendar">Connect Google Calendar</button>`;
-  } else if (calData) {
-    foot = `<span class="muted small">Calendar updated ${esc(timeAgo(calData.fetchedAt))}</span>`;
-  }
+  const foot = connected && calData ? `<span class="muted small">Google Calendar updated ${esc(timeAgo(calData.fetchedAt))}</span>` : "<span></span>";
 
   el.innerHTML = `
-    ${days || `<div class="empty">No events in the next while.</div>`}
-    <div class="row-actions">
-      <button class="btn" data-action="add-event">Add event</button>
+    ${days || `<div class="empty">No upcoming events.</div>`}
+    <div class="card-foot">
       ${foot}
+      <span class="foot-actions"><button class="btn small" data-action="add-event">Add Event</button></span>
     </div>`;
 }
 

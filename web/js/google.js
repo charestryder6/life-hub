@@ -1,6 +1,6 @@
 // Google sign-in (OAuth 2.0 token flow via full-page redirect — this works
-// inside home-screen apps on iPhone where pop-ups don't) plus the Classroom
-// and Calendar API calls.
+// inside home-screen apps on iPhone where pop-ups don't) plus the Calendar
+// API calls. Optional: your iPhone calendar already comes in via the Shortcut.
 
 import { CONFIG } from "../config.js";
 import { store } from "./util.js";
@@ -9,14 +9,6 @@ import { profile } from "./profile.js";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
 export const ACCOUNTS = {
-  classroom: {
-    label: "Google Classroom",
-    scopes: [
-      "https://www.googleapis.com/auth/classroom.courses.readonly",
-      "https://www.googleapis.com/auth/classroom.coursework.me.readonly",
-    ],
-    hint: () => profile().schoolEmail,
-  },
   calendar: {
     label: "Google Calendar",
     scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
@@ -120,68 +112,6 @@ async function pages(kind, baseUrl, field, maxPages = 3) {
     if (!token) break;
   }
   return out;
-}
-
-// ── Classroom ────────────────────────────────────────────────
-
-const CR = "https://classroom.googleapis.com/v1";
-
-function dueDateOf(work) {
-  const d = work.dueDate;
-  if (!d) return null;
-  const t = work.dueTime || {};
-  if (t.hours == null && t.minutes == null) {
-    return new Date(d.year, d.month - 1, d.day, 23, 59);
-  }
-  // Classroom stores due dates/times in UTC.
-  return new Date(Date.UTC(d.year, d.month - 1, d.day, t.hours || 0, t.minutes || 0));
-}
-
-export async function fetchClassroom() {
-  const courses = await pages(
-    "classroom",
-    `${CR}/courses?studentId=me&courseStates=ACTIVE&pageSize=50`,
-    "courses",
-  );
-
-  const perCourse = await Promise.all(
-    courses.map(async (c) => {
-      const [work, subs] = await Promise.all([
-        pages("classroom", `${CR}/courses/${c.id}/courseWork?pageSize=60`, "courseWork", 2).catch(() => []),
-        pages(
-          "classroom",
-          `${CR}/courses/${c.id}/courseWork/-/studentSubmissions?userId=me&pageSize=100`,
-          "studentSubmissions",
-          2,
-        ).catch(() => []),
-      ]);
-      const subBy = Object.fromEntries(subs.map((s) => [s.courseWorkId, s]));
-      return work.map((w) => {
-        const due = dueDateOf(w);
-        const sub = subBy[w.id] || {};
-        return {
-          id: w.id,
-          course: c.name,
-          courseId: c.id,
-          title: w.title,
-          link: sub.alternateLink || w.alternateLink,
-          due: due ? due.toISOString() : null,
-          created: w.creationTime,
-          points: w.maxPoints ?? null,
-          type: w.workType,
-          state: sub.state || "NEW",
-          late: !!sub.late,
-          grade: sub.assignedGrade ?? null,
-        };
-      });
-    }),
-  );
-
-  return {
-    fetchedAt: new Date().toISOString(),
-    courses: courses.map((c) => ({ id: c.id, name: c.name })),
-    work: perCourse.flat(),
-  };
 }
 
 // ── Calendar ─────────────────────────────────────────────────
