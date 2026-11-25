@@ -1,0 +1,66 @@
+name: Build hub
+
+# Publishes web/ to GitHub Pages. Before publishing it pulls fresh Garmin
+# stats (encrypted with HUB_PASSPHRASE) into web/data/garmin.enc.json.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 */2 * * *" # every 2 hours
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Garmin sync
+        run: pip install -r garmin_sync/requirements.txt
+
+      - name: Restore saved Garmin login
+        uses: actions/cache/restore@v4
+        with:
+          path: .garmin-cache
+          key: garmin-token-${{ github.run_id }}
+          restore-keys: garmin-token-
+
+      - name: Sync Garmin
+        continue-on-error: true # the site still publishes if Garmin is down
+        env:
+          GARMIN_TOKENS: ${{ secrets.GARMIN_TOKENS }}
+          HUB_PASSPHRASE: ${{ secrets.HUB_PASSPHRASE }}
+          HUB_TZ: ${{ vars.HUB_TZ }}
+        run: python garmin_sync/sync.py
+
+      - name: Save Garmin login
+        if: hashFiles('.garmin-cache/token.enc.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .garmin-cache
+          key: garmin-token-${{ github.run_id }}
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

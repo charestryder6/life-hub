@@ -1,0 +1,5 @@
+.garmin-cache/
+web/data/garmin.json
+web/data/garmin.enc.json
+__pycache__/
+.venv/
